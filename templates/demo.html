@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bhasa-Ai - Demo</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .hub-wrapper {
+            background: rgba(255, 255, 255, 0.88);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            border-radius: 24px;
+            padding: 28px;
+            box-shadow: 0 20px 40px rgba(30, 41, 59, 0.12);
+            color: #1e293b;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 20px auto;
+        }
+        .hub-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 2px solid #f1f5f9;
+        }
+        .mode-segmented {
+            display: flex;
+            background: #e2e8f0;
+            padding: 4px;
+            border-radius: 12px;
+            gap: 4px;
+        }
+        .mode-segmented input[type="radio"] { display: none; }
+        .mode-segmented label {
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            color: #64748b;
+        }
+        .mode-segmented input[type="radio"]:checked + label {
+            background: #ffffff;
+            color: #4f46e5;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        .offline-badge {
+            background: #dcfce7;
+            color: #15803d;
+            border: 1px solid #bbf7d0;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .hub-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+        }
+        .panel-card {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+        }
+        .panel-card h3 {
+            margin-top: 0;
+            margin-bottom: 16px;
+            font-size: 18px;
+            color: #0f172a;
+            border-bottom: 2px solid #6366f1;
+            display: inline-block;
+            padding-bottom: 4px;
+        }
+        .form-label {
+            display: block;
+            font-weight: 600;
+            font-size: 13px;
+            color: #475569;
+            margin-bottom: 6px;
+        }
+        .form-select, .form-textarea {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1.5px solid #cbd5e1;
+            border-radius: 10px;
+            font-size: 14px;
+            transition: border-color 0.2s;
+            box-sizing: border-box;
+            background-color: #f8fafc;
+        }
+        .form-select:focus, .form-textarea:focus {
+            outline: none;
+            border-color: #6366f1;
+            background-color: #ffffff;
+        }
+        .level-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+        .level-grid input[type="radio"] { display: none; }
+        .level-grid label {
+            text-align: center;
+            padding: 10px;
+            background: #f1f5f9;
+            border: 1.5px solid #cbd5e1;
+            border-radius: 10px;
+            font-size: 13px;
+            font-weight: 600;
+            color: #475569;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .level-grid input[type="radio"]:checked + label {
+            background: #e0e7ff;
+            border-color: #6366f1;
+            color: #4338ca;
+        }
+        .btn-voice {
+            width: 100%;
+            background: #f8fafc;
+            border: 1.5px dashed #6366f1;
+            color: #4f46e5;
+            padding: 10px;
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-bottom: 16px;
+            transition: background 0.2s;
+        }
+        .btn-voice:hover { background: #eef2ff; }
+        .btn-generate {
+            width: 100%;
+            background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+            color: white;
+            border: none;
+            padding: 14px;
+            border-radius: 12px;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: 0 4px 14px rgba(99, 102, 241, 0.35);
+            transition: transform 0.1s, box-shadow 0.2s;
+        }
+        .btn-generate:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 18px rgba(99, 102, 241, 0.45);
+        }
+        .content-box {
+            background: #f8fafc;
+            border-left: 4px solid #6366f1;
+            padding: 12px 16px;
+            border-radius: 0 10px 10px 0;
+            font-size: 14px;
+            line-height: 1.5;
+            margin-bottom: 14px;
+        }
+        .progress-card {
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            border-radius: 12px;
+            padding: 14px;
+            margin-top: 16px;
+        }
+        .translation-panel {
+            max-width: 1200px;
+            margin: 30px auto;
+            background: #ffffff;
+            padding: 24px;
+            border-radius: 16px;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        }
+        .lang-flex {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+        .lang-flex > div {
+            flex: 1;
+        }
+    </style>
+
+    <!-- PDF Download Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+</head>
+
+<body>
+<header class="navbar">
+    <div class="logo">
+        <span>भ</span> Bhasa-Ai
+    </div>
+    <nav>
+        <a href="/">Home</a>
+        <a href="/demo.html" class="active">Demo</a>
+        <a href="/about.html">About</a>
+        <a href="/advantages.html">Advantages</a>
+        <a href="/account.html">Account</a>
+        <a href="/login.html">Login</a>
+    </nav>
+    <div class="nav-buttons">
+        <button id="darkModeToggle" title="Toggle Dark/Light Mode" style="background: none; border: none; cursor: pointer; font-size: 20px; padding: 5px 10px;">🌙</button>
+    </div>
+</header>
+
+<section class="page-header">
+    <h1>Try Bhasa-Ai</h1>
+    <p>Experience our language translation and AI learning hub demo</p>
+</section>
+
+<div class="hub-wrapper">
+    <div class="hub-header">
+        <div class="mode-segmented">
+            <input type="radio" id="modeStudent" name="user_mode" value="student" checked>
+            <label for="modeStudent">👨‍🎓 Student Mode</label>
+            <input type="radio" id="modeTeacher" name="user_mode" value="teacher">
+            <label for="modeTeacher">👨‍🏫 Teacher Mode</label>
+        </div>
+        <div class="offline-badge">
+            <span>🟢</span> Edge Engine Ready
+        </div>
+    </div>
+
+    <div class="hub-grid">
+        <!-- LEFT PANEL: Inputs -->
+        <div class="panel-card">
+            <h3>Input Lesson</h3>
+
+            <div style="margin-bottom: 12px;">
+                <label class="form-label" for="fromLanguage">Input / Voice Language (Bolne / Type karne ki bhasha)</label>
+                <select id="fromLanguage" class="form-select">
+                    <option value="hi-IN">Hindi (हिन्दी)</option>
+                    <option value="bn-IN">Bengali (বাংলা)</option>
+                    <option value="mr-IN">Marathi (मराठी)</option>
+                    <option value="ta-IN">Tamil (தமிழ்)</option>
+                    <option value="te-IN">Telugu (తెలుగు)</option>
+                    <option value="en-US">English</option>
+                </select>
+            </div>
+
+            <button id="recordBtn" type="button" class="btn-voice">
+                🎤 Record Voice Input
+            </button>
+
+            <div style="margin-bottom: 16px;">
+                <label class="form-label" for="toLanguage">Target Output Language / Dialect</label>
+                <select id="toLanguage" class="form-select">
+                    <option value="hi">Hindi (हिन्दी)</option>
+                    <option value="bho">Bhojpuri (भोजपुरी)</option>
+                    <option value="awa">Awadhi (अवधी)</option>
+                    <option value="mr">Marathi (मराठी)</option>
+                    <option value="bn">Bengali (বাংলা)</option>
+                    <option value="ta">Tamil (தமிழ்)</option>
+                    <option value="te">Telugu (తెలుగు)</option>
+                    <option value="en">English</option>
+                </select>
+            </div>
+
+            <div style="margin-bottom: 16px;">
+                <label class="form-label">Student Level (Adapts Difficulty)</label>
+                <div class="level-grid">
+                    <input type="radio" id="lvl1" name="studentLevel" value="Beginner">
+                    <label for="lvl1">Beginner</label>
+
+                    <input type="radio" id="lvl2" name="studentLevel" value="Class 6–8" checked>
+                    <label for="lvl2">Class 6–8</label>
+
+                    <input type="radio" id="lvl3" name="studentLevel" value="Class 9–10">
+                    <label for="lvl3">Class 9–10</label>
+
+                    <input type="radio" id="lvl4" name="studentLevel" value="Class 11–12">
+                    <label for="lvl4">Class 11–12</label>
+                </div>
+            </div>
+
+            <div style="margin-bottom: 16px;">
+                <label class="form-label" for="inputText">Lesson Content or Concept Topic</label>
+                <textarea id="inputText" class="form-textarea" rows="4" placeholder="Type lesson text in any language or click 'Record Voice Input'..."></textarea>
+            </div>
+
+            <button id="generateHubBtn" type="button" class="btn-generate">
+                ✨ Generate Learning Hub
+            </button>
+        </div>
+
+        <!-- RIGHT PANEL: AI Learning Hub Output -->
+        <div class="panel-card" id="learningHubOutputCard">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                <h3 style="margin: 0;">AI Learning Hub</h3>
+                <button id="downloadPdfBtn" type="button" class="btn-generate" style="width: auto; padding: 6px 14px; font-size: 13px; background: #059669;">
+                    📄 Download PDF Notes
+                </button>
+            </div>
+
+            <div id="audioContainer" style="display: none; margin-bottom: 16px;">
+                <label class="form-label">🔊 Vernacular Audio Explanation</label>
+                <audio id="audioPlayer" controls style="width: 100%;"></audio>
+            </div>
+
+            <div>
+                <div style="margin-bottom: 12px;">
+                    <span style="font-weight: 700; font-size: 14px; color: #334155;">📖 Simple Explanation</span>
+                    <div id="simpleExplanation" class="content-box">Enter lesson text and click Generate to produce adaptive content.</div>
+                </div>
+
+                <div style="margin-bottom: 12px;">
+                    <span style="font-weight: 700; font-size: 14px; color: #334155;">💡 Real-life Example</span>
+                    <div id="realExample" class="content-box">-</div>
+                </div>
+
+                <div style="margin-bottom: 12px;">
+                    <span style="font-weight: 700; font-size: 14px; color: #334155;">📝 Key Concepts</span>
+                    <div class="content-box">
+                        <ul id="keyPointsList" style="margin: 0; padding-left: 18px;"><li>-</li></ul>
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 12px;">
+                    <span style="font-weight: 700; font-size: 14px; color: #334155;">📚 Vocabulary Glossary</span>
+                    <div id="glossaryBox" class="content-box">-</div>
+                </div>
+
+                <div style="margin-bottom: 12px;">
+                    <span style="font-weight: 700; font-size: 14px; color: #334155;">❓ Concept Assessment Quiz</span>
+                    <div id="quizContainer" class="content-box">Quiz questions will generate here.</div>
+                </div>
+
+                <div class="progress-card">
+                    <span style="font-weight: 700; font-size: 14px; color: #166534;">📊 Learning Analytics</span>
+                    <div style="font-size: 13px; color: #15803d; margin-top: 4px;">
+                        Lessons Completed: <strong>8/10</strong> &nbsp;|&nbsp; Quiz Score: <strong>80%</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Textbook PDF Translator Panel -->
+<div class="translation-panel" style="margin-top: 20px;">
+    <h3>📄 Textbook PDF Translator</h3>
+
+    <div class="lang-flex">
+        <div>
+            <label class="form-label" for="pdfFromLanguage">PDF Language</label>
+            <select id="pdfFromLanguage" class="form-select">
+                <option value="auto">🌐 Auto-Detect</option>
+                <option value="en">English</option>
+                <option value="hi">Hindi (हिन्दी)</option>
+                <option value="bn">Bengali (বাংলা)</option>
+                <option value="mr">Marathi (मराठी)</option>
+            </select>
+        </div>
+        <div>
+            <label class="form-label" for="pdfToLanguage">Target Vernacular Language</label>
+            <select id="pdfToLanguage" class="form-select">
+                <option value="hi">Hindi (हिन्दी)</option>
+                <option value="bn">Bengali (বাংলা)</option>
+                <option value="mr">Marathi (मराठी)</option>
+                <option value="ta">Tamil (தமிழ்)</option>
+                <option value="te">Telugu (తెలుగు)</option>
+                <option value="bho">Bhojpuri (भोजपुरी)</option>
+                <option value="awa">Awadhi (अवधी)</option>
+                <option value="en">English</option>
+            </select>
+        </div>
+    </div>
+
+    <div style="margin-bottom: 16px;">
+        <label class="form-label" for="pdfFileInput">Select Textbook PDF File</label>
+        <input type="file" id="pdfFileInput" class="form-select" accept="application/pdf" style="padding: 8px;">
+    </div>
+
+    <button id="translatePdfBtn" type="button" class="btn-generate">Translate PDF Textbook</button>
+
+    <div style="margin-top: 16px;">
+        <strong>Translated PDF Content:</strong>
+        <textarea id="pdfTranslationOutput" class="form-textarea" rows="8" readonly placeholder="Translated textbook contents will display page-by-page here..." style="margin-top: 8px; font-family: monospace;"></textarea>
+    </div>
+</div>
+
+<!-- Quick Text Translation Panel -->
+<div class="translation-panel">
+    <h3>Quick Text Translation</h3>
+
+    <div class="lang-flex">
+        <div>
+            <label class="form-label" for="bottomFromLanguage">From Language</label>
+            <select id="bottomFromLanguage" class="form-select">
+                <option value="auto">🌐 Auto-Detect</option>
+                <option value="en">English</option>
+                <option value="hi">Hindi (हिन्दी)</option>
+                <option value="bn">Bengali (বাংলা)</option>
+                <option value="mr">Marathi (मराठी)</option>
+                <option value="ta">Tamil (தமிழ்)</option>
+                <option value="te">Telugu (తెలుగు)</option>
+            </select>
+        </div>
+        <div>
+            <label class="form-label" for="bottomToLanguage">To Language</label>
+            <select id="bottomToLanguage" class="form-select">
+                <option value="hi">Hindi (हिन्दी)</option>
+                <option value="en">English</option>
+                <option value="bn">Bengali (বাংলা)</option>
+                <option value="mr">Marathi (मराठी)</option>
+                <option value="ta">Tamil (தமிழ்)</option>
+                <option value="te">Telugu (తెలుగు)</option>
+                <option value="bho">Bhojpuri (भोजपुरी)</option>
+                <option value="awa">Awadhi (अवधी)</option>
+            </select>
+        </div>
+    </div>
+
+    <div style="margin-bottom: 16px;">
+        <label class="form-label" for="bottomInputText">Enter your text</label>
+        <textarea id="bottomInputText" class="form-textarea" rows="3" placeholder="Type text in any language..."></textarea>
+    </div>
+
+    <button id="bottomTranslateBtn" type="button" class="btn-generate">Translate</button>
+
+    <div style="margin-top: 16px;">
+        <strong>Translation Output:</strong>
+        <div id="translationOutput" class="content-box" style="margin-top: 8px;">
+            Your translation will appear here.
+        </div>
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='javascript/script.js') }}"></script>
+</body>
+</html>

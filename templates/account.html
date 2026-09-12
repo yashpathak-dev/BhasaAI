@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bhasa-Ai - Account</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+
+<body>
+
+<header class="navbar">
+    <div class="logo">
+        <span>भ</span> Bhasa-Ai
+    </div>
+
+    <nav>
+        <a href="/">Home</a>
+        <a href="/demo.html">Demo</a>
+        <a href="/about.html">About</a>
+        <a href="/advantages.html">Advantages</a>
+        <a href="/account.html" class="active">Account</a>
+    </nav>
+
+    <div class="nav-buttons">
+        <button id="darkModeToggle" title="Toggle Dark/Light Mode" style="background: none; border: none; cursor: pointer; font-size: 20px; padding: 5px 10px;">🌙</button>
+        <a href="/" class="login-btn">Home</a>
+    </div>
+</header>
+
+<section class="page-header">
+    <h1>My Account</h1>
+    <p>Manage your Bhasa-Ai profile</p>
+</section>
+
+<div class="account-container">
+    <div class="account-card">
+        <div class="profile-icon">
+            👤
+        </div>
+
+        <h2 style="text-align:center;">User Profile</h2>
+
+        <div class="account-info">
+            <div class="info-row">
+                <span>Name</span>
+                <span id="accountName">Loading...</span>
+            </div>
+
+            <div class="info-row">
+                <span>Email</span>
+                <span id="accountEmail">Loading...</span>
+            </div>
+
+            <div class="info-row">
+                <span>Preferred Language</span>
+                <span>Vernacular / English</span>
+            </div>
+
+            <div class="info-row">
+                <span>Account Status</span>
+                <span style="color: #16a34a; font-weight: 600;">Active</span>
+            </div>
+        </div>
+
+        <button
+            onclick="logoutUser()"
+            class="primary-btn"
+            id="logoutBtn"
+            style="margin-top:25px; border:none; cursor:pointer; width: 100%;">
+            Logout
+        </button>
+    </div>
+
+    <!-- Recent Activity History Card -->
+    <div class="account-card" style="margin-top: 20px; text-align: left;">
+        <h3 style="margin-top:0; border-bottom: 2px solid #6366f1; padding-bottom: 6px;">📜 Recent Activity History</h3>
+        <ul id="historyList" style="padding-left: 20px; font-size: 13px; color: #475569; margin-top: 10px;">
+            <li>Loading history...</li>
+        </ul>
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='javascript/script.js') }}"></script>
+<script>
+async function loadUserProfile() {
+    try {
+        const response = await fetch('/api/user-status');
+        const data = await response.json();
+
+        if (data.logged_in) {
+            document.getElementById("accountName").innerText = data.user.name;
+            document.getElementById("accountEmail").innerText = data.user.email;
+            loadUserHistory();
+        } else {
+            window.location.href = '/login.html';
+        }
+    } catch (error) {
+        console.error("Failed to load user profile:", error);
+    }
+}
+
+async function loadUserHistory() {
+    try {
+        const res = await fetch('/api/history');
+        const data = await res.json();
+        const historyList = document.getElementById("historyList");
+        
+        if (data.success && data.history.length > 0) {
+            historyList.innerHTML = "";
+            data.history.forEach(item => {
+                const li = document.createElement("li");
+                li.style.marginBottom = "8px";
+                li.innerHTML = `<b>${item.type}</b>: "${item.content}" <br><small style="color: #94a3b8;">${item.date}</small>`;
+                historyList.appendChild(li);
+            });
+        } else {
+            historyList.innerHTML = "<li>No recent activity found.</li>";
+        }
+    } catch (e) {
+        console.error("Error loading history:", e);
+        document.getElementById("historyList").innerHTML = "<li>Failed to load history.</li>";
+    }
+}
+
+async function logoutUser() {
+    try {
+        await fetch('/api/logout', { method: 'POST' });
+        window.location.href = '/login.html';
+    } catch (error) {
+        console.error("Logout error:", error);
+    }
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    loadUserProfile();
+});
+</script>
+
+</body>
+</html>

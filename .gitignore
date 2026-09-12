@@ -1,0 +1,7 @@
+bhasa_users.db
+.env
+__pycache__/
+instance/
+.vscode/
+static/audio/
+
