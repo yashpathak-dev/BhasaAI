@@ -1,5 +1,6 @@
 import os
 import hashlib
+import json
 import logging
 from typing import Dict, Any, Optional
 from pathlib import Path
@@ -40,8 +41,14 @@ class TranslationEngine:
         base_dir = Path(__file__).resolve().parent
         self.audio_dir = Path(audio_dir) if audio_dir else base_dir / "static" / "audio"
         self.audio_dir.mkdir(parents=True, exist_ok=True)
-        self.api_key = os.getenv("GEMINI_API_KEY") or "AIzaSyBJ46o9ejN-1dB_f2gBHtk3hcsSYgIqFtE"
+        self.api_key = os.getenv("GEMINI_API_KEY")
+        
+        # Initialized with high-speed Flash model
+        self.model_name = "gemini-3.6-flash"
         self.client = genai.Client(api_key=self.api_key) if (genai is not None and self.api_key) else None
+        
+        # In-memory translation cache for instant repeat results (<10ms)
+        self.translation_cache = {}
 
     def resolve_code(self, lang_name: str) -> str:
         cleaned = (lang_name or "").strip().lower()
@@ -52,16 +59,31 @@ class TranslationEngine:
             return {"success": False, "error": "Empty text", "translated_text": ""}
 
         target_language_name = self.resolve_code(target_lang)
+        cache_key = f"{text.strip().lower()}_{target_language_name}"
+
+        # 1. Instant Memory Cache Check
+        if cache_key in self.translation_cache:
+            return {
+                "success": True,
+                "original_text": text,
+                "translated_text": self.translation_cache[cache_key],
+                "target_lang": target_lang
+            }
 
         if self.client is not None:
             try:
                 prompt = f"Translate the following text accurately into {target_language_name}. Return ONLY the translated text without extra formatting, notes, or quotes:\n\n{text.strip()}"
                 response = self.client.models.generate_content(
-                    model="gemini-3.6-flash",
-                    contents=prompt
+                    model=self.model_name,
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        temperature=0.2, # Low temperature for accurate deterministic translation
+                        top_p=0.9
+                    )
                 )
                 translated = response.text.strip() if response and response.text else ""
                 if translated:
+                    self.translation_cache[cache_key] = translated
                     return {
                         "success": True,
                         "original_text": text,
@@ -124,7 +146,6 @@ class TranslationEngine:
         if not text or not text.strip() or gTTS is None:
             return {"success": False, "audio_url": None}
 
-        # gTTS uses standard language code prefix (e.g. 'hi', 'bn', 'en')
         code_map = {"Hindi": "hi", "Bengali": "bn", "Marathi": "mr", "Tamil": "ta", "Telugu": "te", "Bhojpuri": "hi", "Awadhi": "hi", "English": "en"}
         lang_name = self.resolve_code(lang)
         gtts_lang = code_map.get(lang_name, "hi")

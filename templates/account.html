@@ -108,13 +108,29 @@ async function loadUserHistory() {
         const historyList = document.getElementById("historyList");
         
         if (data.success && data.history.length > 0) {
-            historyList.innerHTML = "";
-            data.history.forEach(item => {
-                const li = document.createElement("li");
-                li.style.marginBottom = "8px";
-                li.innerHTML = `<b>${item.type}</b>: "${item.content}" <br><small style="color: #94a3b8;">${item.date}</small>`;
-                historyList.appendChild(li);
-            });
+                       historyList.innerHTML = "";
+                      data.history.forEach(item => {
+             const li = document.createElement("li");
+             li.style.marginBottom = "8px";
+
+              const b = document.createElement("b");
+                b.textContent = item.type;
+
+             const textNode = document.createTextNode(`: "${item.content}" `);
+
+             const br = document.createElement("br");
+
+             const small = document.createElement("small");
+             small.style.color = "#94a3b8";
+              small.textContent = item.date;
+
+             li.appendChild(b);
+              li.appendChild(textNode);
+             li.appendChild(br);
+              li.appendChild(small);
+
+             historyList.appendChild(li);
+        });
         } else {
             historyList.innerHTML = "<li>No recent activity found.</li>";
         }

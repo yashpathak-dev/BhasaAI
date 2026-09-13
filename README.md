@@ -29,16 +29,18 @@ Bhasa-Ai is an advanced, AI-powered multilingual EdTech and translation platform
 ## 📂 Project Directory Structure
 
 ```text
-Bhasa-Ai/
+BhasaAi_Backend/
 │
 ├── app_backend.py         # Flask server, SQLite auth, and API routes
 ├── translation_engine.py  # Google GenAI translation & TTS wrapper
 ├── ai_engine.py           # Vernacular pedagogy & smart fallback engine
 ├── requirements.txt       # Python dependencies list
 ├── .gitignore             # Git ignore rules for sensitive/cache files
+├── .env                   # Environment variables (API keys & secrets - Ignored by Git)
 ├── bhasa_users.db         # Local SQLite database (Ignored by Git)
 │
 ├── static/
+│   ├── audio/             # Generated text-to-speech audio files (Ignored by Git)
 │   ├── css/
 │   │   └── style.css      # Custom styles & dark mode variables
 │   ├── image/

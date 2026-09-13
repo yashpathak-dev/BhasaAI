@@ -3,7 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#4f46e5">
     <title>Bhasa-Ai - Demo</title>
+
+    <!-- Progressive Web App Manifest -->
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <style>
         .hub-wrapper {
@@ -194,6 +199,9 @@
 
     <!-- PDF Download Library -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+    <!-- IndexedDB Helper Library -->
+    <script src="https://cdn.jsdelivr.net/npm/idb-keyval@6/dist/umd-min.js"></script>
 </head>
 
 <body>

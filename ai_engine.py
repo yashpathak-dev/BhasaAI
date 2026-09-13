@@ -1,13 +1,13 @@
-import os
 import json
-import time
 import logging
+import os
 import re
-from typing import Dict, Any, Optional
+import time
+from typing import Any, Dict, Generator, Optional
 
 logging.basicConfig(
     level=logging.INFO,
-    format="[%(asctime)s] [%(levelname)s] [%(name)s] %(message)s"
+    format="[%(asctime)s] [%(levelname)s] [%(name)s] %(message)s",
 )
 logger = logging.getLogger("AIPedagogyEngine")
 
@@ -19,48 +19,62 @@ except ImportError:
 
 
 class VernacularPedagogyEngine:
-    SUPPORTED_DIALECTS = ["Hindi", "Bhojpuri", "Awadhi", "Marathi", "Bengali", "Tamil", "Telugu", "English"]
+    SUPPORTED_DIALECTS = [
+        "Hindi",
+        "Bhojpuri",
+        "Awadhi",
+        "Marathi",
+        "Bengali",
+        "Tamil",
+        "Telugu",
+        "English",
+    ]
     STUDENT_LEVELS = ["Beginner", "Class 6–8", "Class 9–10", "Class 11–12"]
 
+    # Flash model configuration for ultra-low latency generation
     DEFAULT_MODEL_NAME = "gemini-3.6-flash"
 
     def __init__(self, api_key: Optional[str] = None):
-        self.api_key = api_key or os.getenv("GEMINI_API_KEY") or "AIzaSyBJ46o9ejN-1dB_f2gBHtk3hcsSYgIqFtE"
+        self.api_key = api_key or os.getenv("GEMINI_API_KEY")
         self.model_name = self.DEFAULT_MODEL_NAME
         self.client = None
 
         if self.api_key and genai is not None:
             try:
                 self.client = genai.Client(api_key=self.api_key)
-                logger.info("New Google GenAI Client initialized successfully with provided API key.")
+                logger.info(
+                    "Google GenAI Client initialized successfully."
+                )
             except Exception as exc:
                 logger.error("Error initializing GenAI Client: %s", exc)
 
-    def _get_student_prompt(self, input_text: str, target_dialect: str, student_level: str) -> str:
+    def _get_student_prompt(
+        self, input_text: str, target_dialect: str, student_level: str
+    ) -> str:
         return f"""
-You are an expert school teacher and vernacular educator for Indian students. Create an engaging, educational learning module.
+You are an expert school teacher and vernacular educator for Indian students. Create an engaging, concise learning module.
 
 INPUT TOPIC / TEXT: "{input_text}"
 TARGET DIALECT / LANGUAGE: {target_dialect}
 STUDENT LEVEL: {student_level}
 
-CRITICAL INSTRUCTION: Understand the core concept regardless of the input language, and translate/explain the ENTIRE lesson module strictly in {target_dialect} tailored specifically for a {student_level} student.
+CRITICAL INSTRUCTION: Translate and explain the ENTIRE lesson strictly in {target_dialect} tailored specifically for a {student_level} student. Keep sentences concise to maximize generation speed.
 
 Return ONLY a valid JSON object matching this schema:
 {{
   "topic": "{input_text}",
   "dialect": "{target_dialect}",
   "student_level": "{student_level}",
-  "simple_explanation": "A clear, comprehensive explanation written in {target_dialect} tailored for {student_level}.",
-  "cultural_real_life_example": "A relatable real-life Indian context or example in {target_dialect}.",
-  "key_points": ["Important point 1 in {target_dialect}", "Important point 2 in {target_dialect}", "Important point 3 in {target_dialect}"],
+  "simple_explanation": "A clear, comprehensive explanation written in {target_dialect}.",
+  "cultural_real_life_example": "A relatable real-life Indian context or story in {target_dialect}.",
+  "key_points": ["Point 1 in {target_dialect}", "Point 2 in {target_dialect}", "Point 3 in {target_dialect}"],
   "quiz": [
     {{
       "id": 1,
-      "question": "Question testing understanding in {target_dialect}?",
+      "question": "Question in {target_dialect}?",
       "options": {{"A": "Option 1", "B": "Option 2", "C": "Option 3", "D": "Option 4"}},
       "correct_answer": "A",
-      "explanation": "Explanation of correct answer in {target_dialect}."
+      "explanation": "Explanation in {target_dialect}."
     }}
   ],
   "glossary": [
@@ -69,15 +83,17 @@ Return ONLY a valid JSON object matching this schema:
 }}
 """
 
-    def _get_teacher_prompt(self, input_text: str, target_dialect: str, student_level: str) -> str:
+    def _get_teacher_prompt(
+        self, input_text: str, target_dialect: str, student_level: str
+    ) -> str:
         return f"""
-You are a Master Vernacular Pedagogy Trainer for Indian school teachers. Create a comprehensive 45-minute Lesson Plan & Classroom Worksheet.
+You are a Master Vernacular Pedagogy Trainer for Indian school teachers. Create a 45-minute Lesson Plan & Classroom Worksheet.
 
 TOPIC: "{input_text}"
 TARGET DIALECT / LANGUAGE: {target_dialect}
 CLASS LEVEL: {student_level}
 
-CRITICAL INSTRUCTION: Everything must be prepared in {target_dialect} (or bilingual with English technical terms) so teachers can directly teach in class.
+CRITICAL INSTRUCTION: Prepare lesson guidance in {target_dialect} (or bilingual with English technical terms).
 
 Return ONLY a valid JSON object matching this schema:
 {{
@@ -98,10 +114,10 @@ Return ONLY a valid JSON object matching this schema:
   "quiz": [
     {{
       "id": 1,
-      "question": "Worksheet Question 1 (Short Answer/Conceptual) in {target_dialect}?",
+      "question": "Worksheet Question 1 in {target_dialect}?",
       "options": {{"A": "Model Answer Point 1", "B": "Model Answer Point 2", "C": "Key Takeaway", "D": "Common Mistake to Avoid"}},
       "correct_answer": "A",
-      "explanation": "Teacher Guide: How to grade or explain this question in class."
+      "explanation": "Teacher Guide: How to grade or explain this question."
     }}
   ]
 }}
@@ -113,7 +129,7 @@ Return ONLY a valid JSON object matching this schema:
             lines = text.splitlines()
             lines = lines[1:-1] if lines[-1].startswith("```") else lines[1:]
             text = "\n".join(lines).strip()
-        match = re.search(r'(\{[\s\S]*\})', text)
+        match = re.search(r"(\{[\s\S]*\})", text)
         return match.group(1) if match else text
 
     def generate_vernacular_lesson(
@@ -122,21 +138,36 @@ Return ONLY a valid JSON object matching this schema:
         target_dialect: str = "Hindi",
         student_level: str = "Class 6–8",
         mode: str = "student",
-        max_retries: int = 3
+        max_retries: int = 2,
     ) -> Dict[str, Any]:
         if not input_text or not input_text.strip():
             return {"success": False, "error": "Input text cannot be empty."}
 
         matched_dialect = next(
-            (d for d in self.SUPPORTED_DIALECTS if d.lower() == target_dialect.strip().lower()),
-            "Hindi"
+            (
+                d
+                for d in self.SUPPORTED_DIALECTS
+                if d.lower() == target_dialect.strip().lower()
+            ),
+            "Hindi",
         )
-        normalized_level = student_level.strip().replace("-", "\u2013")
+        normalized_level = student_level.strip().replace("-", "–")
 
         if not self.api_key or genai is None or self.client is None:
-            return {"success": False, "error": "API key missing or GenAI client not initialized."}
+            return {
+                "success": False,
+                "error": "API key missing or GenAI client not initialized.",
+            }
 
-        prompt = self._get_teacher_prompt(input_text, matched_dialect, normalized_level) if mode == "teacher" else self._get_student_prompt(input_text, matched_dialect, normalized_level)
+        prompt = (
+            self._get_teacher_prompt(
+                input_text, matched_dialect, normalized_level
+            )
+            if mode == "teacher"
+            else self._get_student_prompt(
+                input_text, matched_dialect, normalized_level
+            )
+        )
 
         for attempt in range(1, max_retries + 1):
             try:
@@ -144,16 +175,73 @@ Return ONLY a valid JSON object matching this schema:
                     model=self.model_name,
                     contents=prompt,
                     config=types.GenerateContentConfig(
-                        temperature=0.4,
-                        top_p=0.95,
-                        response_mime_type="application/json"
-                    )
+                        temperature=0.3,
+                        top_p=0.9,
+                        response_mime_type="application/json",
+                    ),
                 )
                 cleaned_json = self.clean_json_response(response.text)
                 parsed_data = json.loads(cleaned_json)
-                return {"success": True, "data": parsed_data, "is_fallback": False}
+                return {
+                    "success": True,
+                    "data": parsed_data,
+                    "is_fallback": False,
+                }
             except Exception as exc:
                 logger.warning("Attempt %d failed: %s", attempt, exc)
-                time.sleep(1)
+                if attempt < max_retries:
+                    time.sleep(0.5)
 
-        return {"success": False, "error": "Failed to generate lesson from GenAI service."}
+        return {
+            "success": False,
+            "error": "Failed to generate lesson from GenAI service.",
+        }
+
+    def stream_vernacular_lesson(
+        self,
+        input_text: str,
+        target_dialect: str = "Hindi",
+        student_level: str = "Class 6–8",
+        mode: str = "student",
+    ) -> Generator[str, None, None]:
+        if not self.api_key or genai is None or self.client is None:
+            yield json.dumps(
+                {"error": "API key missing or GenAI client not initialized."}
+            )
+            return
+
+        matched_dialect = next(
+            (
+                d
+                for d in self.SUPPORTED_DIALECTS
+                if d.lower() == target_dialect.strip().lower()
+            ),
+            "Hindi",
+        )
+        normalized_level = student_level.strip().replace("-", "–")
+        prompt = (
+            self._get_teacher_prompt(
+                input_text, matched_dialect, normalized_level
+            )
+            if mode == "teacher"
+            else self._get_student_prompt(
+                input_text, matched_dialect, normalized_level
+            )
+        )
+
+        try:
+            response_stream = self.client.models.generate_content_stream(
+                model=self.model_name,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    temperature=0.3,
+                    top_p=0.9,
+                    response_mime_type="application/json",
+                ),
+            )
+            for chunk in response_stream:
+                if chunk.text:
+                    yield chunk.text
+        except Exception as exc:
+            logger.error("Error in streaming vernacular lesson: %s", exc)
+            yield json.dumps({"error": str(exc)})

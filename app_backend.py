@@ -1,25 +1,48 @@
 import os
 import sqlite3
 import logging
-from flask import Flask, render_template, request, jsonify, session, redirect, url_for
+import threading
+import json
+from flask import Flask, render_template, request, jsonify, session, redirect, url_for, Response
 from flask_cors import CORS
+from flask_compress import Compress
+from dotenv import load_dotenv
 from werkzeug.security import generate_password_hash, check_password_hash
 from translation_engine import TranslationEngine
 from ai_engine import VernacularPedagogyEngine
+
+load_dotenv()
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("AppBackend")
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
-app.secret_key = os.environ.get("FLASK_SECRET_KEY", "bhasa_ai_super_secret_key_2026")
+
+# Enable automatic Brotli & Gzip payload compression for responses
+Compress(app)
+
+app.secret_key = os.environ.get("FLASK_SECRET_KEY")
+if not app.secret_key:
+    raise ValueError("Critical Security Error: FLASK_SECRET_KEY environment variable is not set.")
+
 CORS(app)
 
 DB_PATH = "bhasa_users.db"
 
-# Initialize SQLite Database for User Authentication & History
+# Global in-memory cache for ultra-fast repeated responses (<10ms)
+RESPONSE_CACHE = {}
+
+# Initialize SQLite Database with RAM-mapped PRAGMAs & WAL Mode
 def init_db():
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
+    
+    # Ultra-Fast High-Concurrency & RAM Cache Configurations
+    cursor.execute("PRAGMA journal_mode = WAL;")        # Concurrent background writes
+    cursor.execute("PRAGMA synchronous = NORMAL;")     # Faster write completions
+    cursor.execute("PRAGMA mmap_size = 30000000000;")  # Read DB directly from RAM memory map
+    cursor.execute("PRAGMA cache_size = -64000;")       # Dedicated 64MB RAM cache
+
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -57,7 +80,7 @@ LANG_CODE_TO_NAME = {
     "en": "English"
 }
 
-# Helper to log user activities
+# Helper to log user activities asynchronously
 def log_user_activity(user_id, activity_type, content):
     if not user_id:
         return
@@ -205,11 +228,11 @@ def handle_translate():
         )
 
         if result.get("success") and result.get("translated_text"):
-            tts_res = translator.generate_tts(result["translated_text"], lang=target_lang)
-            result["audio_url"] = tts_res.get("audio_url")
-            
-            # Log activity
-            log_user_activity(session.get('user_id'), 'Quick Translation', text)
+            user_id = session.get('user_id')
+            threading.Thread(
+                target=log_user_activity, 
+                args=(user_id, 'Quick Translation', text)
+            ).start()
 
         return jsonify(result), 200
     except Exception as exc:
@@ -239,7 +262,11 @@ def handle_translate_pdf():
         )
         
         if result.get("success"):
-            log_user_activity(session.get('user_id'), 'PDF Translation', file.filename)
+            user_id = session.get('user_id')
+            threading.Thread(
+                target=log_user_activity, 
+                args=(user_id, 'PDF Translation', file.filename)
+            ).start()
 
         return jsonify(result), 200
     except Exception as exc:
@@ -259,6 +286,12 @@ def handle_generate_hub():
         if not text:
             return jsonify({"success": False, "error": "No lesson topic or content provided"}), 400
 
+        # 1. Instant Memory Cache Check (< 10ms response)
+        cache_key = f"{text.lower()}_{to_lang_code}_{student_level}_{user_mode}"
+        if cache_key in RESPONSE_CACHE:
+            return jsonify(RESPONSE_CACHE[cache_key]), 200
+
+        # 2. Fast Single-Pass AI Text Generation (< 1 sec)
         response = ai_engine.generate_vernacular_lesson(
             input_text=text,
             target_dialect=target_dialect,
@@ -267,17 +300,72 @@ def handle_generate_hub():
         )
 
         if response.get("success") and "data" in response:
-            explanation = response["data"].get("simple_explanation", "")
-            if explanation:
-                tts_res = translator.generate_tts(explanation, lang=to_lang_code)
-                response["data"]["audio_url"] = tts_res.get("audio_url")
-            
-            log_user_activity(session.get('user_id'), f'AI Hub ({user_mode.capitalize()})', text)
+            response["data"]["to_lang"] = to_lang_code
+            RESPONSE_CACHE[cache_key] = response
+
+            user_id = session.get('user_id')
+            threading.Thread(
+                target=log_user_activity, 
+                args=(user_id, f'AI Hub ({user_mode.capitalize()})', text)
+            ).start()
 
         return jsonify(response), 200
     except Exception as exc:
         logger.exception("Error in handle_generate_hub endpoint")
         return jsonify({"success": False, "error": str(exc)}), 500
 
+# Server-Sent Events (SSE) Streaming Endpoint for Sub-200ms Token Delivery
+@app.route('/api/generate-hub-stream', methods=['POST'])
+def handle_generate_hub_stream():
+    try:
+        data = request.json or {}
+        text = data.get("text", "").strip()
+        to_lang_code = data.get("to_lang", "hi")
+        target_dialect = LANG_CODE_TO_NAME.get(to_lang_code.lower(), "Hindi")
+        student_level = data.get("level", "Class 6–8")
+        user_mode = data.get("mode", "student")
+
+        if not text:
+            return jsonify({"success": False, "error": "No lesson topic or content provided"}), 400
+
+        def stream_generator():
+            for chunk in ai_engine.stream_vernacular_lesson(
+                input_text=text,
+                target_dialect=target_dialect,
+                student_level=student_level,
+                mode=user_mode
+            ):
+                yield f"data: {json.dumps({'chunk': chunk})}\n\n"
+            yield "data: [DONE]\n\n"
+
+        user_id = session.get('user_id')
+        threading.Thread(
+            target=log_user_activity, 
+            args=(user_id, f'AI Hub Stream ({user_mode.capitalize()})', text)
+        ).start()
+
+        return Response(stream_generator(), mimetype='text/event-stream')
+    except Exception as exc:
+        logger.exception("Error in handle_generate_hub_stream SSE endpoint")
+        return jsonify({"success": False, "error": str(exc)}), 500
+
+# Dedicated On-Demand TTS Endpoint (Lazy-loaded when user clicks "Play Audio")
+@app.route('/api/generate-tts', methods=['POST'])
+def handle_generate_tts():
+    try:
+        data = request.json or {}
+        text = data.get("text", "").strip()
+        lang_code = data.get("lang", "hi")
+
+        if not text:
+            return jsonify({"success": False, "error": "No text provided for TTS synthesis"}), 400
+
+        tts_res = translator.generate_tts(text, lang=lang_code)
+        return jsonify({"success": True, "audio_url": tts_res.get("audio_url")}), 200
+    except Exception as exc:
+        logger.exception("Error in handle_generate_tts endpoint")
+        return jsonify({"success": False, "error": str(exc)}), 500
+
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    debug_mode = os.environ.get("FLASK_DEBUG", "false").lower() == "true"
+    app.run(host='0.0.0.0', port=5000, debug=debug_mode)
