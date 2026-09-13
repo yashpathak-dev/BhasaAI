@@ -71,6 +71,24 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // ==========================================
+    // 3.1 Village Mode Initializer & Toggle Handler
+    // ==========================================
+    const villageModeToggle = document.getElementById("villageModeToggle");
+    const currentVillageMode = localStorage.getItem("bhasa_village_mode") === "true";
+
+    if (currentVillageMode) {
+        document.body.classList.add("village-mode");
+    }
+
+    if (villageModeToggle) {
+        villageModeToggle.addEventListener("click", () => {
+            document.body.classList.toggle("village-mode");
+            const isVillage = document.body.classList.contains("village-mode");
+            localStorage.setItem("bhasa_village_mode", isVillage);
+        });
+    }
+
+    // ==========================================
     // 4. Voice Input Handler (Dynamic Speech Recognition)
     // ==========================================
     const recordBtn = document.getElementById("recordBtn");
@@ -134,8 +152,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 window.speechSynthesis.cancel();
                 const utterance = new SpeechSynthesisUtterance(textToPlay);
                 utterance.lang = (targetLang === 'bho' || targetLang === 'awa') ? 'hi-IN' : `${targetLang}-IN`;
-                utterance.onend = () => { playBtn.innerText = "🔊 Listen to Lesson"; };
-                utterance.onerror = () => { playBtn.innerText = "🔊 Listen to Lesson"; };
+                utterance.onend = () => { playBtn.innerText = "🔊 Listen"; };
+                utterance.onerror = () => { playBtn.innerText = "🔊 Listen"; };
                 window.speechSynthesis.speak(utterance);
                 return;
             } else {
@@ -144,7 +162,7 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         }
 
-        playBtn.innerText = "⏳ Synthesizing Audio...";
+        playBtn.innerText = "⏳ Synthesizing...";
         try {
             const ttsRes = await fetch(`${API_BASE}/generate-tts`, {
                 method: 'POST',
@@ -160,7 +178,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 } else {
                     new Audio(ttsData.audio_url).play();
                 }
-                playBtn.innerText = "🔊 Replay Lesson Audio";
+                playBtn.innerText = "🔊 Replay";
             } else {
                 throw new Error("Cloud TTS response unsuccessful");
             }
@@ -171,7 +189,24 @@ document.addEventListener("DOMContentLoaded", () => {
                 utterance.lang = 'hi-IN';
                 window.speechSynthesis.speak(utterance);
             }
-            playBtn.innerText = "🔊 Listen to Lesson";
+            playBtn.innerText = "🔊 Listen";
+        }
+    }
+
+    // ==========================================
+    // 5.1 Gamified Streaks & Badges Evaluation
+    // ==========================================
+    function checkAndAwardBadge(quizScore) {
+        let streak = parseInt(localStorage.getItem('bhasa_streak') || '0', 10);
+        if (quizScore >= 80) {
+            streak += 1;
+            localStorage.setItem('bhasa_streak', streak);
+        }
+        let badges = JSON.parse(localStorage.getItem('bhasa_badges') || '[]');
+        if (streak >= 3 && !badges.includes('Streak Master')) {
+            badges.push('Streak Master');
+            localStorage.setItem('bhasa_badges', JSON.stringify(badges));
+            alert('🎉 Milestone Unlocked: Streak Master Badge Earned!');
         }
     }
 
@@ -189,6 +224,23 @@ document.addEventListener("DOMContentLoaded", () => {
 
         if (simpleExp) simpleExp.innerText = data.simple_explanation || "-";
         if (realEx) realEx.innerText = data.cultural_real_life_example || data.real_example || "-";
+
+        // Bind dedicated Speak button functionality
+        const speakExplanationBtn = document.getElementById("speakExplanationBtn");
+        if (speakExplanationBtn && data.simple_explanation) {
+            speakExplanationBtn.onclick = () => playAudioSmart(data.simple_explanation, targetLang, speakExplanationBtn, audioPlayer);
+        }
+
+        // Bind WhatsApp Share functionality
+        const whatsappShareBtn = document.getElementById("whatsappShareBtn");
+        if (whatsappShareBtn) {
+            whatsappShareBtn.onclick = () => {
+                const title = document.getElementById("inputText")?.value || "Learning Hub Lesson";
+                const explanation = data.simple_explanation || "";
+                const message = encodeURIComponent(`📚 *Bhasa-AI Learning Hub*\n\n*Topic:* ${title}\n\n${explanation}\n\n_Generated via Bhasa-AI Edge Platform_`);
+                window.open(`https://api.whatsapp.com/send?text=${message}`, '_blank');
+            };
+        }
 
         if (audioContainer && data.simple_explanation) {
             audioContainer.style.display = "block";
@@ -237,6 +289,9 @@ document.addEventListener("DOMContentLoaded", () => {
             quizContainer.innerHTML = "";
             const quizList = data.quiz || [];
             if (Array.isArray(quizList) && quizList.length > 0) {
+                let totalCorrectCount = 0;
+                let answeredQuestionsCount = 0;
+
                 quizList.forEach((q, qIndex) => {
                     const qCard = document.createElement("div");
                     qCard.style.cssText = "background:#ffffff; border:1px solid #e2e8f0; padding:12px; border-radius:12px; margin-bottom:12px;";
@@ -269,7 +324,9 @@ document.addEventListener("DOMContentLoaded", () => {
                                 b.style.cursor = "default";
                             });
 
+                            answeredQuestionsCount++;
                             if (selected === correct) {
+                                totalCorrectCount++;
                                 btn.style.background = "#dcfce7";
                                 btn.style.borderColor = "#22c55e";
                                 btn.style.color = "#15803d";
@@ -297,6 +354,11 @@ document.addEventListener("DOMContentLoaded", () => {
                                 feedbackBox.style.border = "1px solid #fecaca";
                                 feedbackBox.innerHTML = `❌ <b>Galat Utar.</b> Sahi utar <b>(${correct})</b> hai. ${q.explanation || ''}`;
                             }
+
+                            if (answeredQuestionsCount === quizList.length) {
+                                const finalScorePercent = Math.round((totalCorrectCount / quizList.length) * 100);
+                                checkAndAwardBadge(finalScorePercent);
+                            }
                         });
                     });
 
@@ -309,7 +371,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // ==========================================
-    // 7. Ultra-Fast AI Hub Generator (SSE Real-Time Stream + IndexedDB Offline Storage)
+    // 7. Ultra-Fast AI Hub Generator (SSE Real-Time Stream + IndexedDB Offline Storage + Semantic RAG Fallback)
     // ==========================================
     const hubBtn = document.getElementById("generateHubBtn");
     if (hubBtn) {
@@ -336,7 +398,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     : "Connecting to streaming AI engine...";
             }
 
-            // Async IndexedDB & Local File Fallback Processor
+            // Async IndexedDB, Local File & Semantic RAG Fallback Processor
             async function processOfflineFallback() {
                 try {
                     const res = await fetch('/static/data/ncert_db.json');
@@ -346,6 +408,14 @@ document.addEventListener("DOMContentLoaded", () => {
                     if (ncertDB[ncertKey] || (ncertDB.chapters && ncertDB.chapters[ncertKey])) {
                         const content = ncertDB[ncertKey] || ncertDB.chapters[ncertKey].content[targetLang] || ncertDB.chapters[ncertKey];
                         renderHubUI(content, userMode, targetLang);
+                        return true;
+                    }
+
+                    // Semantic keyword / similarity lookup simulation over database keys
+                    const dbKeys = Object.keys(ncertDB);
+                    const matchingKey = dbKeys.find(k => k.includes(lessonText.toLowerCase()) || lessonText.toLowerCase().includes(k.split('_')[0]));
+                    if (matchingKey && ncertDB[matchingKey]) {
+                        renderHubUI(ncertDB[matchingKey], userMode, targetLang);
                         return true;
                     }
                 } catch (err) {
@@ -565,11 +635,11 @@ document.addEventListener("DOMContentLoaded", () => {
             }
 
             const options = {
-                margin:       10,
-                filename:     'Bhasa-AI_Vernacular_Notes.pdf',
-                image:        { type: 'jpeg', quality: 0.98 },
+                margin:      10,
+                filename:    'Bhasa-AI_Vernacular_Notes.pdf',
+                image:       { type: 'jpeg', quality: 0.98 },
                 html2canvas:  { scale: 2 },
-                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+                jsPDF:       { unit: 'mm', format: 'a4', orientation: 'portrait' }
             };
 
             html2pdf().set(options).from(hubElement).save();

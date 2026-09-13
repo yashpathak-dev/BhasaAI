@@ -218,6 +218,7 @@
         <a href="/login.html">Login</a>
     </nav>
     <div class="nav-buttons">
+        <button id="villageModeToggle" title="Toggle Village/Rural Mode" style="background: none; border: none; cursor: pointer; font-size: 20px; padding: 5px 10px;">🌾</button>
         <button id="darkModeToggle" title="Toggle Dark/Light Mode" style="background: none; border: none; cursor: pointer; font-size: 20px; padding: 5px 10px;">🌙</button>
     </div>
 </header>
@@ -264,14 +265,41 @@
             <div style="margin-bottom: 16px;">
                 <label class="form-label" for="toLanguage">Target Output Language / Dialect</label>
                 <select id="toLanguage" class="form-select">
-                    <option value="hi">Hindi (हिन्दी)</option>
-                    <option value="bho">Bhojpuri (भोजपुरी)</option>
-                    <option value="awa">Awadhi (अवधी)</option>
-                    <option value="mr">Marathi (मराठी)</option>
-                    <option value="bn">Bengali (বাংলা)</option>
-                    <option value="ta">Tamil (தமிழ்)</option>
-                    <option value="te">Telugu (తెలుగు)</option>
-                    <option value="en">English</option>
+                    <optgroup label="Major Indian Languages">
+                        <option value="hi" selected>Hindi (हिन्दी)</option>
+                        <option value="bn">Bengali (বাংলা)</option>
+                        <option value="mr">Marathi (मराठी)</option>
+                        <option value="ta">Tamil (தமிழ்)</option>
+                        <option value="te">Telugu (తెలుగు)</option>
+                        <option value="gu">Gujarati (ગુજરાતી)</option>
+                        <option value="kn">Kannada (ಕನ್ನಡ)</option>
+                        <option value="ml">Malayalam (മലയാളം)</option>
+                        <option value="pa">Punjabi (ਪੰਜਾਬੀ)</option>
+                        <option value="or">Odia (ଓଡ଼ିଆ)</option>
+                        <option value="as">Assamese (অসমীয়া)</option>
+                        <option value="ur">Urdu (اردو)</option>
+                    </optgroup>
+                    <optgroup label="Regional & Tribal Dialects">
+                        <option value="sat">Santali (संताली / 𑢠𑢵𑢀)</option>
+                        <option value="bho">Bhojpuri (भोजपुरी)</option>
+                        <option value="awa">Awadhi (अवधी)</option>
+                        <option value="mai">Maithili (मैथिली)</option>
+                        <option value="dgo">Dogri (डोगरी)</option>
+                        <option value="brx">Bodo (बड़ो)</option>
+                        <option value="mag">Magahi (मागधी)</option>
+                        <option value="hne">Chhattisgarhi (छत्तीसगढ़ी)</option>
+                    </optgroup>
+                    <optgroup label="Global Languages">
+                        <option value="en">English</option>
+                        <option value="es">Spanish (Español)</option>
+                        <option value="fr">French (Français)</option>
+                        <option value="de">German (Deutsch)</option>
+                        <option value="zh">Chinese (中文)</option>
+                        <option value="ja">Japanese (日本語)</option>
+                        <option value="ar">Arabic (العربية)</option>
+                        <option value="ru">Russian (Русский)</option>
+                        <option value="pt">Portuguese (Português)</option>
+                    </optgroup>
                 </select>
             </div>
 
@@ -306,9 +334,13 @@
         <div class="panel-card" id="learningHubOutputCard">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
                 <h3 style="margin: 0;">AI Learning Hub</h3>
-                <button id="downloadPdfBtn" type="button" class="btn-generate" style="width: auto; padding: 6px 14px; font-size: 13px; background: #059669;">
-                    📄 Download PDF Notes
-                </button>
+                <div style="display: flex; gap: 8px;">
+                    <button id="speakExplanationBtn" type="button" class="btn-generate" style="width: auto; padding: 6px 12px; font-size: 13px; background: #2563eb;">🔊 Listen</button>
+                    <button id="whatsappShareBtn" type="button" class="btn-generate" style="width: auto; padding: 6px 12px; font-size: 13px; background: #16a34a;">💬 Share</button>
+                    <button id="downloadPdfBtn" type="button" class="btn-generate" style="width: auto; padding: 6px 14px; font-size: 13px; background: #059669;">
+                        📄 Download PDF Notes
+                    </button>
+                </div>
             </div>
 
             <div id="audioContainer" style="display: none; margin-bottom: 16px;">
@@ -373,14 +405,41 @@
         <div>
             <label class="form-label" for="pdfToLanguage">Target Vernacular Language</label>
             <select id="pdfToLanguage" class="form-select">
-                <option value="hi">Hindi (हिन्दी)</option>
-                <option value="bn">Bengali (বাংলা)</option>
-                <option value="mr">Marathi (मराठी)</option>
-                <option value="ta">Tamil (தமிழ்)</option>
-                <option value="te">Telugu (తెలుగు)</option>
-                <option value="bho">Bhojpuri (भोजपुरी)</option>
-                <option value="awa">Awadhi (अवधी)</option>
-                <option value="en">English</option>
+                <optgroup label="Major Indian Languages">
+                    <option value="hi" selected>Hindi (हिन्दी)</option>
+                    <option value="bn">Bengali (বাংলা)</option>
+                    <option value="mr">Marathi (मराठी)</option>
+                    <option value="ta">Tamil (தமிழ்)</option>
+                    <option value="te">Telugu (తెలుగు)</option>
+                    <option value="gu">Gujarati (ગુજરાતી)</option>
+                    <option value="kn">Kannada (ಕನ್ನಡ)</option>
+                    <option value="ml">Malayalam (മലയാളം)</option>
+                    <option value="pa">Punjabi (ਪੰਜਾਬੀ)</option>
+                    <option value="or">Odia (ଓଡ଼ିଆ)</option>
+                    <option value="as">Assamese (অসমীয়া)</option>
+                    <option value="ur">Urdu (اردو)</option>
+                </optgroup>
+                <optgroup label="Regional & Tribal Dialects">
+                    <option value="sat">Santali (संताली / 𑢠𑢵𑢀)</option>
+                    <option value="bho">Bhojpuri (भोजपुरी)</option>
+                    <option value="awa">Awadhi (अवधी)</option>
+                    <option value="mai">Maithili (मैथिली)</option>
+                    <option value="dgo">Dogri (डोगरी)</option>
+                    <option value="brx">Bodo (बड़ो)</option>
+                    <option value="mag">Magahi (मागधी)</option>
+                    <option value="hne">Chhattisgarhi (छत्तीसगढ़ी)</option>
+                </optgroup>
+                <optgroup label="Global Languages">
+                    <option value="en">English</option>
+                    <option value="es">Spanish (Español)</option>
+                    <option value="fr">French (Français)</option>
+                    <option value="de">German (Deutsch)</option>
+                    <option value="zh">Chinese (中文)</option>
+                    <option value="ja">Japanese (日本語)</option>
+                    <option value="ar">Arabic (العربية)</option>
+                    <option value="ru">Russian (Русский)</option>
+                    <option value="pt">Portuguese (Português)</option>
+                </optgroup>
             </select>
         </div>
     </div>
@@ -418,14 +477,41 @@
         <div>
             <label class="form-label" for="bottomToLanguage">To Language</label>
             <select id="bottomToLanguage" class="form-select">
-                <option value="hi">Hindi (हिन्दी)</option>
-                <option value="en">English</option>
-                <option value="bn">Bengali (বাংলা)</option>
-                <option value="mr">Marathi (मराठी)</option>
-                <option value="ta">Tamil (தமிழ்)</option>
-                <option value="te">Telugu (తెలుగు)</option>
-                <option value="bho">Bhojpuri (भोजपुरी)</option>
-                <option value="awa">Awadhi (अवधी)</option>
+                <optgroup label="Major Indian Languages">
+                    <option value="hi" selected>Hindi (हिन्दी)</option>
+                    <option value="bn">Bengali (বাংলা)</option>
+                    <option value="mr">Marathi (मराठी)</option>
+                    <option value="ta">Tamil (தமிழ்)</option>
+                    <option value="te">Telugu (తెలుగు)</option>
+                    <option value="gu">Gujarati (ગુજરાતી)</option>
+                    <option value="kn">Kannada (ಕನ್ನಡ)</option>
+                    <option value="ml">Malayalam (മലയാളം)</option>
+                    <option value="pa">Punjabi (ਪੰਜਾਬੀ)</option>
+                    <option value="or">Odia (ଓଡ଼ିଆ)</option>
+                    <option value="as">Assamese (অসমীয়া)</option>
+                    <option value="ur">Urdu (اردو)</option>
+                </optgroup>
+                <optgroup label="Regional & Tribal Dialects">
+                    <option value="sat">Santali (संताली / 𑢠𑢵𑢀)</option>
+                    <option value="bho">Bhojpuri (भोजपुरी)</option>
+                    <option value="awa">Awadhi (अवधी)</option>
+                    <option value="mai">Maithili (मैथिली)</option>
+                    <option value="dgo">Dogri (डोगरी)</option>
+                    <option value="brx">Bodo (बड़ो)</option>
+                    <option value="mag">Magahi (मागधी)</option>
+                    <option value="hne">Chhattisgarhi (छत्तीसगढ़ी)</option>
+                </optgroup>
+                <optgroup label="Global Languages">
+                    <option value="en">English</option>
+                    <option value="es">Spanish (Español)</option>
+                    <option value="fr">French (Français)</option>
+                    <option value="de">German (Deutsch)</option>
+                    <option value="zh">Chinese (中文)</option>
+                    <option value="ja">Japanese (日本語)</option>
+                    <option value="ar">Arabic (العربية)</option>
+                    <option value="ru">Russian (Русский)</option>
+                    <option value="pt">Portuguese (Português)</option>
+                </optgroup>
             </select>
         </div>
     </div>

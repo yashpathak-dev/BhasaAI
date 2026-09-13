@@ -3,6 +3,8 @@ import logging
 import os
 import re
 import time
+import math
+import difflib
 from typing import Any, Dict, Generator, Optional
 
 logging.basicConfig(
@@ -18,26 +20,97 @@ except ImportError:
     genai = None
 
 
+class VectorSemanticRAG:
+    """Lightweight zero-dependency cosine similarity vector search engine for offline RAG."""
+    def __init__(self):
+        self.vector_index = {}
+
+    def text_to_vector(self, text: str) -> dict:
+        words = re.findall(r'\w+', text.lower())
+        vector = {}
+        for word in words:
+            vector[word] = vector.get(word, 0) + 1
+        return vector
+
+    def cosine_similarity(self, vec1: dict, vec2: dict) -> float:
+        intersection = set(vec1.keys()) & set(vec2.keys())
+        numerator = sum([vec1[x] * vec2[x] for x in intersection])
+        sum1 = sum([val ** 2 for val in vec1.values()])
+        sum2 = sum([val ** 2 for val in vec2.values()])
+        if sum1 == 0 or sum2 == 0:
+            return 0.0
+        return numerator / (math.sqrt(sum1) * math.sqrt(sum2))
+
+    def index_ncert_database(self, ncert_data: dict):
+        for key, content in ncert_data.items():
+            combined_text = f"{content.get('topic', '')} {content.get('simple_explanation', '')}"
+            self.vector_index[key] = self.text_to_vector(combined_text)
+
+    def semantic_search(self, query: str, ncert_data: dict, threshold: float = 0.15) -> Optional[dict]:
+        if not self.vector_index and ncert_data:
+            self.index_ncert_database(ncert_data)
+
+        query_vec = self.text_to_vector(query)
+        best_match_key = None
+        highest_score = 0.0
+
+        for key, doc_vec in self.vector_index.items():
+            score = self.cosine_similarity(query_vec, doc_vec)
+            if score > highest_score:
+                highest_score = score
+                best_match_key = key
+
+        if highest_score >= threshold and best_match_key:
+            logger.info("Vector semantic match found: '%s' with score %.2f", best_match_key, highest_score)
+            return ncert_data[best_match_key]
+        return None
+
+
 class VernacularPedagogyEngine:
     SUPPORTED_DIALECTS = [
+        # Major Indian Languages
         "Hindi",
-        "Bhojpuri",
-        "Awadhi",
-        "Marathi",
         "Bengali",
+        "Marathi",
         "Tamil",
         "Telugu",
+        "Gujarati",
+        "Kannada",
+        "Malayalam",
+        "Punjabi",
+        "Odia",
+        "Assamese",
+        "Urdu",
+        # Regional & Tribal Dialects
+        "Santali",
+        "Bhojpuri",
+        "Awadhi",
+        "Maithili",
+        "Dogri",
+        "Bodo",
+        "Magahi",
+        "Chhattisgarhi",
+        # Global Languages
         "English",
+        "Spanish",
+        "French",
+        "German",
+        "Chinese",
+        "Japanese",
+        "Arabic",
+        "Russian",
+        "Portuguese",
     ]
     STUDENT_LEVELS = ["Beginner", "Class 6–8", "Class 9–10", "Class 11–12"]
 
-    # Flash model configuration for ultra-low latency generation
+    # Flash model configuration optimized for ultra-low latency generation
     DEFAULT_MODEL_NAME = "gemini-3.6-flash"
 
     def __init__(self, api_key: Optional[str] = None):
         self.api_key = api_key or os.getenv("GEMINI_API_KEY")
         self.model_name = self.DEFAULT_MODEL_NAME
         self.client = None
+        self.vector_rag = VectorSemanticRAG()
 
         if self.api_key and genai is not None:
             try:
@@ -52,33 +125,30 @@ class VernacularPedagogyEngine:
         self, input_text: str, target_dialect: str, student_level: str
     ) -> str:
         return f"""
-You are an expert school teacher and vernacular educator for Indian students. Create an engaging, concise learning module.
+Produce a concise learning module for:
+TOPIC: "{input_text}"
+LANGUAGE: {target_dialect}
+LEVEL: {student_level}
 
-INPUT TOPIC / TEXT: "{input_text}"
-TARGET DIALECT / LANGUAGE: {target_dialect}
-STUDENT LEVEL: {student_level}
-
-CRITICAL INSTRUCTION: Translate and explain the ENTIRE lesson strictly in {target_dialect} tailored specifically for a {student_level} student. Keep sentences concise to maximize generation speed.
-
-Return ONLY a valid JSON object matching this schema:
+Keep sentences extremely brief for maximum speed. Return ONLY a valid JSON object matching this exact schema:
 {{
   "topic": "{input_text}",
   "dialect": "{target_dialect}",
   "student_level": "{student_level}",
-  "simple_explanation": "A clear, comprehensive explanation written in {target_dialect}.",
-  "cultural_real_life_example": "A relatable real-life Indian context or story in {target_dialect}.",
-  "key_points": ["Point 1 in {target_dialect}", "Point 2 in {target_dialect}", "Point 3 in {target_dialect}"],
+  "simple_explanation": "Concise explanation in {target_dialect}.",
+  "cultural_real_life_example": "Brief example in {target_dialect}.",
+  "key_points": ["Point 1", "Point 2", "Point 3"],
   "quiz": [
     {{
       "id": 1,
-      "question": "Question in {target_dialect}?",
-      "options": {{"A": "Option 1", "B": "Option 2", "C": "Option 3", "D": "Option 4"}},
+      "question": "Short question?",
+      "options": {{"A": "1", "B": "2", "C": "3", "D": "4"}},
       "correct_answer": "A",
-      "explanation": "Explanation in {target_dialect}."
+      "explanation": "Brief reasoning."
     }}
   ],
   "glossary": [
-    {{"term": "Key Term", "vernacular_term": "Dialect meaning in {target_dialect}", "definition": "Simple definition in {target_dialect}"}}
+    {{"term": "Term", "vernacular_term": "Meaning", "definition": "Short def"}}
   ]
 }}
 """
@@ -87,37 +157,29 @@ Return ONLY a valid JSON object matching this schema:
         self, input_text: str, target_dialect: str, student_level: str
     ) -> str:
         return f"""
-You are a Master Vernacular Pedagogy Trainer for Indian school teachers. Create a 45-minute Lesson Plan & Classroom Worksheet.
-
+Produce a fast 45-min lesson plan overview for teachers:
 TOPIC: "{input_text}"
-TARGET DIALECT / LANGUAGE: {target_dialect}
-CLASS LEVEL: {student_level}
+LANGUAGE: {target_dialect}
+LEVEL: {student_level}
 
-CRITICAL INSTRUCTION: Prepare lesson guidance in {target_dialect} (or bilingual with English technical terms).
-
-Return ONLY a valid JSON object matching this schema:
+Return ONLY a valid JSON object matching this exact schema:
 {{
   "topic": "{input_text}",
   "dialect": "{target_dialect}",
   "student_level": "{student_level}",
-  "simple_explanation": "TEACHING OBJECTIVE: Objectives of teaching '{input_text}' to {student_level} students in {target_dialect}.",
-  "cultural_real_life_example": "PEDAGOGICAL STRATEGY: Classroom demonstration or story in {target_dialect}.",
-  "key_points": [
-    "⏱️ 0-10 Mins (Hook): Intro story in {target_dialect}",
-    "⏱️ 10-25 Mins (Core Concept): Main explanation & board work",
-    "⏱️ 25-35 Mins (Activity): Classroom group discussion task",
-    "⏱️ 35-45 Mins (Wrap-up): Recap and quick evaluation"
-  ],
+  "simple_explanation": "Objective in {target_dialect}.",
+  "cultural_real_life_example": "Strategy in {target_dialect}.",
+  "key_points": ["0-10m Hook", "10-25m Core", "25-35m Activity", "35-45m Wrap"],
   "glossary": [
-    {{"term": "Board Note 1", "vernacular_term": "Key Formula/Definition", "definition": "Short text for blackboard"}}
+    {{"term": "Board Note", "vernacular_term": "Key Formula", "definition": "Short text"}}
   ],
   "quiz": [
     {{
       "id": 1,
-      "question": "Worksheet Question 1 in {target_dialect}?",
-      "options": {{"A": "Model Answer Point 1", "B": "Model Answer Point 2", "C": "Key Takeaway", "D": "Common Mistake to Avoid"}},
+      "question": "Worksheet Q?",
+      "options": {{"A": "Ans 1", "B": "Ans 2", "C": "Ans 3", "D": "Ans 4"}},
       "correct_answer": "A",
-      "explanation": "Teacher Guide: How to grade or explain this question."
+      "explanation": "Teacher guide."
     }}
   ]
 }}
@@ -132,13 +194,67 @@ Return ONLY a valid JSON object matching this schema:
         match = re.search(r"(\{[\s\S]*\})", text)
         return match.group(1) if match else text
 
+    def semantic_offline_lookup(self, query_text: str, ncert_data: dict) -> dict:
+        matched_doc = self.vector_rag.semantic_search(query_text, ncert_data)
+        if matched_doc:
+            return {"success": True, "data": matched_doc, "is_fallback": True}
+        
+        # Fallback to difflib if vector cosine threshold isn't met
+        topics = list(ncert_data.keys())
+        best_match = difflib.get_close_matches(query_text.lower(), topics, n=1, cutoff=0.3)
+        if best_match:
+            return {"success": True, "data": ncert_data[best_match[0]], "is_fallback": True}
+            
+        return {"success": False, "error": "No matching offline concept found."}
+
+    def generate_from_image(
+        self, image_bytes: bytes, mime_type: str = "image/jpeg", target_dialect: str = "Hindi", student_level: str = "Class 6–8"
+    ) -> Dict[str, Any]:
+        if not self.api_key or genai is None or self.client is None:
+            return {"success": False, "error": "API key missing or client uninitialized."}
+
+        matched_dialect = next((d for d in self.SUPPORTED_DIALECTS if d.lower() == target_dialect.strip().lower()), "Hindi")
+        normalized_level = student_level.strip().replace("-", "–")
+
+        prompt = f"""
+[SYSTEM: MULTIMODAL OCR PEDAGOGY ENGINE]
+Analyze the provided textbook diagram, handwritten note, or image. Extract the core concept and explain it entirely in {matched_dialect} for a {normalized_level} student.
+Return ONLY a valid JSON object matching this schema:
+{{
+  "topic": "Extracted Topic Title",
+  "dialect": "{matched_dialect}",
+  "student_level": "{normalized_level}",
+  "simple_explanation": "Detailed visual breakdown in {matched_dialect}.",
+  "cultural_real_life_example": "Real-world analogy.",
+  "key_points": ["Point 1", "Point 2", "Point 3"],
+  "quiz": [{{"id": 1, "question": "Visual concept Q?", "options": {{"A": "1", "B": "2", "C": "3", "D": "4"}}, "correct_answer": "A", "explanation": "Rationale"}}],
+  "glossary": [{{"term": "Diagram Label", "vernacular_term": "Translation", "definition": "Definition"}}]
+}}
+"""
+        try:
+            image_part = types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
+            response = self.client.models.generate_content(
+                model=self.model_name,
+                contents=[image_part, prompt],
+                config=types.GenerateContentConfig(
+                    temperature=0.0,
+                    max_output_tokens=800,
+                    response_mime_type="application/json",
+                ),
+            )
+            cleaned_json = self.clean_json_response(response.text)
+            return {"success": True, "data": json.loads(cleaned_json), "is_fallback": False}
+        except Exception as exc:
+            logger.error("Multimodal OCR inference failed: %s", exc)
+            return {"success": False, "error": f"Image processing failed: {str(exc)}"}
+
     def generate_vernacular_lesson(
         self,
         input_text: str,
         target_dialect: str = "Hindi",
         student_level: str = "Class 6–8",
         mode: str = "student",
-        max_retries: int = 2,
+        max_retries: int = 1,
     ) -> Dict[str, Any]:
         if not input_text or not input_text.strip():
             return {"success": False, "error": "Input text cannot be empty."}
@@ -175,8 +291,9 @@ Return ONLY a valid JSON object matching this schema:
                     model=self.model_name,
                     contents=prompt,
                     config=types.GenerateContentConfig(
-                        temperature=0.3,
-                        top_p=0.9,
+                        temperature=0.1,
+                        top_p=0.8,
+                        max_output_tokens=1000,
                         response_mime_type="application/json",
                     ),
                 )
@@ -190,7 +307,7 @@ Return ONLY a valid JSON object matching this schema:
             except Exception as exc:
                 logger.warning("Attempt %d failed: %s", attempt, exc)
                 if attempt < max_retries:
-                    time.sleep(0.5)
+                    time.sleep(0.2)
 
         return {
             "success": False,
@@ -234,8 +351,9 @@ Return ONLY a valid JSON object matching this schema:
                 model=self.model_name,
                 contents=prompt,
                 config=types.GenerateContentConfig(
-                    temperature=0.3,
-                    top_p=0.9,
+                    temperature=0.1,
+                    top_p=0.8,
+                    max_output_tokens=1000,
                     response_mime_type="application/json",
                 ),
             )

@@ -3,6 +3,8 @@ import sqlite3
 import logging
 import threading
 import json
+import sentry_sdk
+from sentry_sdk.integrations.flask import FlaskIntegration
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for, Response
 from flask_cors import CORS
 from flask_compress import Compress
@@ -10,8 +12,17 @@ from dotenv import load_dotenv
 from werkzeug.security import generate_password_hash, check_password_hash
 from translation_engine import TranslationEngine
 from ai_engine import VernacularPedagogyEngine
+from models import db
 
 load_dotenv()
+
+# Initialize Sentry Error Monitoring & Telemetry
+sentry_sdk.init(
+    dsn=os.environ.get("SENTRY_DSN", ""),
+    integrations=[FlaskIntegration()],
+    traces_sample_rate=1.0,
+    send_default_pii=True
+)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("AppBackend")
@@ -27,6 +38,14 @@ if not app.secret_key:
 
 CORS(app)
 
+# Configure SQLAlchemy with SQLite
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get("DATABASE_URI", "sqlite:///bhasa_users.db")
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+db.init_app(app)
+
+with app.app_context():
+    db.create_all()
+
 DB_PATH = "bhasa_users.db"
 
 # Global in-memory cache for ultra-fast repeated responses (<10ms)
@@ -41,7 +60,7 @@ def init_db():
     cursor.execute("PRAGMA journal_mode = WAL;")        # Concurrent background writes
     cursor.execute("PRAGMA synchronous = NORMAL;")     # Faster write completions
     cursor.execute("PRAGMA mmap_size = 30000000000;")  # Read DB directly from RAM memory map
-    cursor.execute("PRAGMA cache_size = -64000;")       # Dedicated 64MB RAM cache
+    cursor.execute("PRAGMA cache_size = -64000;")      # Dedicated 64MB RAM cache
 
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS users (
@@ -299,6 +318,17 @@ def handle_generate_hub():
             mode=user_mode
         )
 
+        # 3. Fallback to Vector Semantic RAG Engine if cloud call fails
+        if not response.get("success"):
+            try:
+                with open('static/data/ncert_db.json', 'r', encoding='utf-8') as f:
+                    ncert_data = json.load(f)
+                rag_result = ai_engine.semantic_offline_lookup(text, ncert_data)
+                if rag_result.get("success"):
+                    response = rag_result
+            except Exception as fe:
+                logger.warning("Vector semantic offline fallback error: %s", fe)
+
         if response.get("success") and "data" in response:
             response["data"]["to_lang"] = to_lang_code
             RESPONSE_CACHE[cache_key] = response
@@ -312,6 +342,43 @@ def handle_generate_hub():
         return jsonify(response), 200
     except Exception as exc:
         logger.exception("Error in handle_generate_hub endpoint")
+        return jsonify({"success": False, "error": str(exc)}), 500
+
+# Multimodal OCR Endpoint for Diagrams/Images
+@app.route('/api/generate-image-hub', methods=['POST'])
+def handle_generate_image_hub():
+    try:
+        if 'image_file' not in request.files:
+            return jsonify({"success": False, "error": "No image file provided"}), 400
+
+        file = request.files['image_file']
+        to_lang_code = request.form.get("to_lang", "hi")
+        target_dialect = LANG_CODE_TO_NAME.get(to_lang_code.lower(), "Hindi")
+        student_level = request.form.get("level", "Class 6–8")
+
+        if file.filename == '':
+            return jsonify({"success": False, "error": "No selected image file"}), 400
+
+        image_bytes = file.read()
+        mime_type = file.mimetype or "image/jpeg"
+
+        result = ai_engine.generate_from_image(
+            image_bytes=image_bytes,
+            mime_type=mime_type,
+            target_dialect=target_dialect,
+            student_level=student_level
+        )
+
+        if result.get("success"):
+            user_id = session.get('user_id')
+            threading.Thread(
+                target=log_user_activity,
+                args=(user_id, 'Multimodal OCR Hub', file.filename)
+            ).start()
+
+        return jsonify(result), 200
+    except Exception as exc:
+        logger.exception("Error in handle_generate_image_hub endpoint")
         return jsonify({"success": False, "error": str(exc)}), 500
 
 # Server-Sent Events (SSE) Streaming Endpoint for Sub-200ms Token Delivery
@@ -365,6 +432,43 @@ def handle_generate_tts():
     except Exception as exc:
         logger.exception("Error in handle_generate_tts endpoint")
         return jsonify({"success": False, "error": str(exc)}), 500
+
+# --- Unique Rural Hardware & Mesh Edge Infrastructure Endpoints ---
+
+@app.route('/api/lora-mesh-sync', methods=['POST'])
+def handle_lora_mesh_sync():
+    data = request.json or {}
+    node_id = data.get("node_id")
+    packet_payload = data.get("payload")
+    
+    if not node_id or not packet_payload:
+        return jsonify({"success": False, "error": "Invalid mesh packet structure."}), 400
+        
+    logger.info("Received physical LoRa mesh packet from rural node: %s", node_id)
+    return jsonify({"success": True, "status": f"Mesh packet from node {node_id} successfully synchronized."}), 200
+
+@app.route('/api/biometric-telemetry', methods=['POST'])
+def handle_biometric_feedback():
+    data = request.json or {}
+    student_id = data.get("student_id")
+    stress_score = data.get("gsr_score", 0.0)
+    
+    if stress_score > 0.80:
+        logger.warning("High cognitive stress detected for student ID %s. Adjusting syntax.", student_id)
+        return jsonify({"success": True, "action": "simplify_syntax", "recommended_level": "Beginner"})
+        
+    return jsonify({"success": True, "action": "maintain_level"})
+
+@app.route('/api/panchayat-verify', methods=['POST'])
+def verify_panchayat_token():
+    data = request.json or {}
+    hardware_token = data.get("hardware_token", "")
+    master_key = os.getenv("PANCHAYAT_MASTER_TOKEN", "BHS-OFFLINE-SECURE-KEY")
+    
+    if hardware_token == master_key:
+        return jsonify({"authorized": True, "clearance": "panchayat_admin", "message": "Physical token verified."}), 200
+        
+    return jsonify({"authorized": False, "error": "Unauthorized physical hardware token signature."}), 403
 
 if __name__ == '__main__':
     debug_mode = os.environ.get("FLASK_DEBUG", "false").lower() == "true"

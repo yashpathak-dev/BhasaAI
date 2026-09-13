@@ -564,6 +564,44 @@ textarea {
     border-left-color: #818cf8 !important;
 }
 
+/* Village Mode Styling */
+body.village-mode {
+    font-size: 20px !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+}
+
+body.village-mode .hub-wrapper,
+body.village-mode .panel-card,
+body.village-mode .translation-panel,
+body.village-mode .demo-box,
+body.village-mode .auth-box,
+body.village-mode .feature-card {
+    border: 3px solid #000000 !important;
+    box-shadow: none !important;
+    background: #fffdf0 !important;
+    color: #000000 !important;
+}
+
+body.village-mode button, 
+body.village-mode .btn-generate,
+body.village-mode .primary-btn {
+    font-size: 18px !important;
+    padding: 16px !important;
+    background: #000000 !important;
+    color: #ffffff !important;
+    border-radius: 12px !important;
+}
+
+body.village-mode input,
+body.village-mode select,
+body.village-mode textarea {
+    background: #ffffff !important;
+    color: #000000 !important;
+    border: 2px solid #000000 !important;
+    font-size: 18px !important;
+}
+
 
 /* =========================
    RESPONSIVE
